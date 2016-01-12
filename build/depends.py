@@ -374,25 +374,10 @@ class TestHeaders(Dependence):
 
 class FidLib(Dependence):
 
-    def sources(self, build):
-        symbol = None
-        if build.platform_is_windows:
-            if build.toolchain_is_msvs:
-                symbol = 'T_MSVC'
-            elif build.crosscompile:
-                # Not sure why, but fidlib won't build with mingw32msvc and
-                # T_MINGW
-                symbol = 'T_LINUX'
-            elif build.toolchain_is_gnu:
-                symbol = 'T_MINGW'
-        else:
-            symbol = 'T_LINUX'
-
-        return [build.env.StaticObject('#lib/fidlib-0.9.10/fidlib.c',
-                                       CPPDEFINES=symbol)]
-
     def configure(self, build, conf):
-        build.env.Append(CPPPATH='#lib/fidlib-0.9.10/')
+        if not conf.CheckLib('fidlib'):
+            raise Exception('Did not find fidlib library, exiting!')
+        build.env.Append(CPPPATH=[SCons.ARGUMENTS.get('prefix') + '/include/fidlib'])
 
 
 class ReplayGain(Dependence):
@@ -405,42 +390,17 @@ class ReplayGain(Dependence):
 
 
 class SoundTouch(Dependence):
-    SOUNDTOUCH_PATH = 'soundtouch-1.8.0'
 
     def sources(self, build):
-        return ['engine/enginebufferscalest.cpp',
-                '#lib/%s/AAFilter.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/BPMDetect.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/FIFOSampleBuffer.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/FIRFilter.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/InterpolateCubic.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/InterpolateLinear.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/InterpolateShannon.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/PeakFinder.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/RateTransposer.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/SoundTouch.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/TDStretch.cpp' % self.SOUNDTOUCH_PATH,
-                # SoundTouch CPU optimizations are only for x86
-                # architectures. SoundTouch automatically ignores these files
-                # when it is not being built for an architecture that supports
-                # them.
-                '#lib/%s/cpu_detect_x86.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/mmx_optimized.cpp' % self.SOUNDTOUCH_PATH,
-                '#lib/%s/sse_optimized.cpp' % self.SOUNDTOUCH_PATH]
+        return ['engine/enginebufferscalest.cpp']
 
     def configure(self, build, conf, env=None):
         if env is None:
             env = build.env
-        env.Append(CPPPATH=['#lib/%s' % self.SOUNDTOUCH_PATH])
-
-        # Prevents circular import.
-        from features import Optimize
-
-        # If we do not want optimizations then disable them.
-        optimize = (build.flags['optimize'] if 'optimize' in build.flags
-                    else Optimize.get_optimization_level(build))
-        if optimize == Optimize.LEVEL_OFF:
-            env.Append(CPPDEFINES='SOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS')
+        if not conf.CheckLib(['SoundTouch','libSoundTouch']):
+            raise Exception('Did not find SoundTouch library, exiting!')
+        build.env.Append(CPPPATH=[SCons.ARGUMENTS.get('prefix') + '/include/soundtouch'])
+        build.env.Append(LIBS='SoundTouch')
 
 
 class RubberBand(Dependence):

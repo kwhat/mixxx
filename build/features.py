@@ -81,10 +81,6 @@ class HID(Feature):
     def configure(self, build, conf):
         if not self.enabled(build):
             return
-        # TODO(XXX) allow external hidapi install, but for now we just use our
-        # internal one.
-        build.env.Append(
-            CPPPATH=[os.path.join(self.HIDAPI_INTERNAL_PATH, 'hidapi')])
 
         if build.platform_is_linux:
             build.env.ParseConfig(
@@ -109,24 +105,15 @@ class HID(Feature):
 
         build.env.Append(CPPDEFINES='__HID__')
 
-    def sources(self, build):
-        sources = ['controllers/hid/hidcontroller.cpp',
-                   'controllers/hid/hidenumerator.cpp',
-                   'controllers/hid/hidcontrollerpresetfilehandler.cpp']
+        if not conf.CheckLib('hidapi-libusb'):
+            raise Exception('Did not find HID API library, exiting!')
+        build.env.Append(CPPPATH=[SCons.ARGUMENTS.get('prefix') + '/include/hidapi'])
+        build.env.Append(LIBS='hidapi-libusb')
 
-        if build.platform_is_windows:
-            # Requires setupapi.lib which is included by the above check for
-            # setupapi.
-            sources.append(
-                os.path.join(self.HIDAPI_INTERNAL_PATH, "windows/hid.c"))
-        elif build.platform_is_linux:
-            # hidapi compiles the libusb implementation by default on Linux
-            sources.append(
-                os.path.join(self.HIDAPI_INTERNAL_PATH, 'libusb/hid.c'))
-        elif build.platform_is_osx:
-            sources.append(
-                os.path.join(self.HIDAPI_INTERNAL_PATH, 'mac/hid.c'))
-        return sources
+    def sources(self, build):
+        return ['controllers/hid/hidcontroller.cpp',
+                'controllers/hid/hidenumerator.cpp',
+                'controllers/hid/hidcontrollerpresetfilehandler.cpp']
 
 
 class Bulk(Feature):
@@ -768,25 +755,15 @@ class TestSuite(Feature):
             test_env.Append(CCFLAGS='-pthread')
             test_env.Append(LINKFLAGS='-pthread')
 
-        test_env.Append(CPPPATH="#lib/gtest-1.7.0/include")
-        gtest_dir = test_env.Dir("#lib/gtest-1.7.0")
-        # gtest_dir.addRepository(build.env.Dir('#lib/gtest-1.5.0'))
-        # build.env['EXE_OUTPUT'] = '#/lib/gtest-1.3.0/bin'  # example,
-        # optional
-        test_env['LIB_OUTPUT'] = '#/lib/gtest-1.7.0/lib'
+        if not conf.CheckLib('gtest'):
+            raise Exception('Did not find gtest library, exiting!')
+        test_env.Append(CPPPATH=[SCons.ARGUMENTS.get('prefix') + '/include/gtest'])
+        test_env.Append(LIBS='gtest')
 
-        env = test_env
-        SCons.Export('env')
-        SCons.Export('build')
-        env.SConscript(env.File('SConscript', gtest_dir))
-
-        # build and configure gmock
-        test_env.Append(CPPPATH="#lib/gmock-1.7.0/include")
-        gmock_dir = test_env.Dir("#lib/gmock-1.7.0")
-        # gmock_dir.addRepository(build.env.Dir('#lib/gmock-1.5.0'))
-        test_env['LIB_OUTPUT'] = '#/lib/gmock-1.7.0/lib'
-
-        env.SConscript(env.File('SConscript', gmock_dir))
+        if not conf.CheckLib('gmock'):
+            raise Exception('Did not find gmock library, exiting!')
+        test_env.Append(CPPPATH=[SCons.ARGUMENTS.get('prefix') + '/include/gmock'])
+        test_env.Append(LIBS='gmock')
 
         # Build the benchmark library
         test_env.Append(CPPPATH="#lib/benchmark/include")
